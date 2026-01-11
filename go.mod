@@ -2,7 +2,10 @@ module github.com/atikayda/caddy-csp-modifier
 
 go 1.25
 
-require github.com/caddyserver/caddy/v2 v2.10.2
+require (
+	github.com/andybalholm/brotli v1.2.0
+	github.com/caddyserver/caddy/v2 v2.10.2
+)
 
 require (
 	cel.dev/expr v0.24.0 // indirect

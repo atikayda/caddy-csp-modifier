@@ -2,11 +2,15 @@ package cspmodifier
 
 import (
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/andybalholm/brotli"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -82,8 +86,15 @@ func (r *responseBuffer) finish() error {
 
 	body := r.body.Bytes()
 	contentType := r.header.Get("Content-Type")
+	contentEncoding := r.header.Get("Content-Encoding")
 
 	if r.injectScript != "" && strings.HasPrefix(contentType, "text/html") {
+		decompressed, err := r.decompress(body, contentEncoding)
+		if err == nil && decompressed != nil {
+			body = decompressed
+			r.header.Del("Content-Encoding")
+		}
+
 		script := r.injectScript
 		if nonce != "" {
 			script = strings.Replace(script, "<script", `<script nonce="`+nonce+`"`, 1)
@@ -102,6 +113,30 @@ func (r *responseBuffer) finish() error {
 	r.ResponseWriter.WriteHeader(r.status)
 	_, err := r.ResponseWriter.Write(body)
 	return err
+}
+
+func (r *responseBuffer) decompress(data []byte, encoding string) ([]byte, error) {
+	switch encoding {
+	case "gzip":
+		reader, err := gzip.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, err
+		}
+		defer reader.Close()
+		return io.ReadAll(reader)
+
+	case "deflate":
+		reader := flate.NewReader(bytes.NewReader(data))
+		defer reader.Close()
+		return io.ReadAll(reader)
+
+	case "br":
+		reader := brotli.NewReader(bytes.NewReader(data))
+		return io.ReadAll(reader)
+
+	default:
+		return nil, nil
+	}
 }
 
 func (r *responseBuffer) processCSP(csp string) (nonce string, modified string) {
