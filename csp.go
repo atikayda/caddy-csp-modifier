@@ -35,6 +35,10 @@ func (CSPModifier) CaddyModule() caddy.ModuleInfo {
 }
 
 func (m *CSPModifier) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	if isWebSocket(r) {
+		return next.ServeHTTP(w, r)
+	}
+
 	rec := &responseBuffer{
 		ResponseWriter: w,
 		header:         make(http.Header),
@@ -47,6 +51,10 @@ func (m *CSPModifier) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	}
 
 	return rec.finish()
+}
+
+func isWebSocket(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 }
 
 type responseBuffer struct {
