@@ -12,6 +12,7 @@ import (
 
 	"github.com/andybalholm/brotli"
 	"github.com/caddyserver/caddy/v2"
+	"github.com/klauspost/compress/zstd"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
@@ -140,6 +141,14 @@ func (r *responseBuffer) decompress(data []byte, encoding string) ([]byte, error
 
 	case "br":
 		reader := brotli.NewReader(bytes.NewReader(data))
+		return io.ReadAll(reader)
+
+	case "zstd":
+		reader, err := zstd.NewReader(bytes.NewReader(data))
+		if err != nil {
+			return nil, err
+		}
+		defer reader.Close()
 		return io.ReadAll(reader)
 
 	default:
